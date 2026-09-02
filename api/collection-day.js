@@ -28,15 +28,8 @@ function buildAddressRegexSource(address) {
 
 function parseNextCollectionDay(snippet) {
   if (!snippet) return null
-  const match = snippet.match(/(?:next\s+)?collection day is\s*:?\s*([^\n.]+)/i)
-  if (match) return match[1].trim()
-  const firstLine = snippet
-    .split('\n')
-    .map((line) => line.trim())
-    .find(Boolean)
-  if (!firstLine) return null
-  const stripped = firstLine.replace(/^(?:your\s+)?(?:next\s+)?collection day is\s*:?\s*/i, '')
-  return stripped.trim() || firstLine
+  const match = snippet.match(/next collection date is\s*([^\n]+)/i)
+  return match ? match[1].trim() : null
 }
 
 async function launchBrowser() {
