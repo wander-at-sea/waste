@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Garden waste collection day</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font: 18px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        box-sizing: border-box;
+      }
+      main {
+        max-width: 26rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        opacity: 0.7;
+        margin: 0 0 1rem;
+      }
+      .answer {
+        font-size: 1.6rem;
+        font-weight: 700;
+        line-height: 1.3;
+      }
+      .muted {
+        opacity: 0.65;
+        font-size: 0.95rem;
+      }
+      .error {
+        color: #c0392b;
+        font-size: 1rem;
+        text-align: left;
+        white-space: pre-wrap;
+      }
+      img {
+        max-width: 100%;
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fortnightly garden waste collection &mdash; TN13 3AB, 17 The Drive</h1>
+      <div id="result" class="muted">Checking…</div>
+    </main>
+    <script>
+      const el = document.getElementById('result')
+      fetch('/api/collection-day')
+        .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok || !data.success) {
+            el.innerHTML =
+              '<p class="error">Lookup failed at step "' +
+              (data.step || 'unknown') +
+              '": ' +
+              (data.message || 'unknown error') +
+              '</p>' +
+              (data.screenshot ? '<img src="' + data.screenshot + '" alt="Failure screenshot" />' : '')
+            return
+          }
+          el.innerHTML =
+            '<div class="answer">Your next collection day is ' +
+            (data.nextCollectionDay || '(not found)') +
+            '</div>'
+        })
+        .catch((err) => {
+          el.innerHTML = '<p class="error">Request failed: ' + err.message + '</p>'
+        })
+    </script>
+  </body>
+</html>

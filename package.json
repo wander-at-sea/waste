@@ -1,0 +1,10 @@
+{
+  "name": "sevenoaks-waste-collection",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@sparticuz/chromium": "^149.0.0",
+    "puppeteer-core": "^25.9.0"
+  }
+}
