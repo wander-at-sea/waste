@@ -115,7 +115,7 @@
             '<div class="answer">' +
             (data.nextCollectionDay || '(not found — see debug info below)') +
             '</div>' +
-            debugHtml(data)
+            (data.nextCollectionDay ? '' : debugHtml(data))
         })
         .catch((err) => {
           el.innerHTML = '<p class="error">Request failed: ' + err.message + '</p>'

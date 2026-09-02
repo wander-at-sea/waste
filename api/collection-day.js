@@ -244,23 +244,21 @@ export default async function handler(req, res) {
       const cardHtml = card.outerHTML.slice(0, 4000)
       const cardText = (card.innerText || '').slice(0, 2000)
 
-      // Find the leaf label element whose own text is "Your next collection date is",
-      // then read the value from its next sibling (or, failing that, from text
-      // following the label within the same parent).
-      const nodes = Array.from(card.querySelectorAll('*'))
-      const labelEl = nodes.find(
-        (el) => el.children.length === 0 && /next collection date is\s*:?\s*$/i.test((el.textContent || '').trim()),
+      // The page renders each label/value as its own '.page_fragment' element, in order,
+      // with a hidden screen-reader-only <span> sometimes sitting between them (which is
+      // NOT a '.page_fragment' so it's naturally skipped here). The value fragment's own
+      // 'data-current_value' attribute can be stale/wrong, so read the visible
+      // '.value-as-text' span instead.
+      const fragments = Array.from(card.querySelectorAll('.page_fragment'))
+      const labelIndex = fragments.findIndex((el) =>
+        /^your next collection date is\s*:?$/i.test((el.textContent || '').trim()),
       )
 
       let nextCollectionDay = null
-      if (labelEl) {
-        let sib = labelEl.nextElementSibling
-        while (sib && !(sib.textContent || '').trim()) sib = sib.nextElementSibling
-        if (sib) nextCollectionDay = (sib.textContent || '').trim()
-      }
-      if (!nextCollectionDay) {
-        const match = cardText.match(/next collection date is\s*:?\s*\n?\s*([^\n]+)/i)
-        if (match) nextCollectionDay = match[1].trim()
+      if (labelIndex !== -1 && fragments[labelIndex + 1]) {
+        const valueFragment = fragments[labelIndex + 1]
+        const valueEl = valueFragment.querySelector('.value-as-text')
+        nextCollectionDay = (valueEl ? valueEl.textContent : valueFragment.textContent || '').trim()
       }
 
       return { nextCollectionDay, cardHtml, cardText }
