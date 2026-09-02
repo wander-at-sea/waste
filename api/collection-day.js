@@ -28,13 +28,15 @@ function buildAddressRegexSource(address) {
 
 function parseNextCollectionDay(snippet) {
   if (!snippet) return null
-  const match = snippet.match(/your next collection day is\s*:?\s*([^\n.]+)/i)
+  const match = snippet.match(/(?:next\s+)?collection day is\s*:?\s*([^\n.]+)/i)
   if (match) return match[1].trim()
   const firstLine = snippet
     .split('\n')
     .map((line) => line.trim())
     .find(Boolean)
-  return firstLine || null
+  if (!firstLine) return null
+  const stripped = firstLine.replace(/^(?:your\s+)?(?:next\s+)?collection day is\s*:?\s*/i, '')
+  return stripped.trim() || firstLine
 }
 
 async function launchBrowser() {
