@@ -26,11 +26,6 @@ function buildAddressRegexSource(address) {
   return `\\b${words.join('\\s+')}\\b`
 }
 
-function parseNextCollectionDay(snippet) {
-  if (!snippet) return null
-  const match = snippet.match(/next collection date is\s*([^\n]+)/i)
-  return match ? match[1].trim() : null
-}
 
 async function launchBrowser() {
   const executablePath = await chromium.executablePath()
@@ -224,22 +219,61 @@ export default async function handler(req, res) {
     }
 
     steps.push('extract-answer')
-    const snippet = await page.evaluate((heading) => {
-      const text = document.body.innerText.replace(/\r/g, '')
-      const idx = text.indexOf(heading)
-      if (idx === -1) return null
-      return text.slice(idx + heading.length, idx + heading.length + 600)
-    }, HEADING_TEXT)
+    const extracted = await page.evaluate((heading) => {
+      // Find the leaf element that IS the heading (no child elements, exact text match).
+      const all = Array.from(document.querySelectorAll('*'))
+      const headingEl = all.find(
+        (el) => el.children.length === 0 && (el.textContent || '').trim() === heading,
+      )
+      if (!headingEl) return { nextCollectionDay: null, cardHtml: null, cardText: null }
 
-    const nextCollectionDay = parseNextCollectionDay(snippet)
+      // Walk up to the smallest ancestor that also contains the "next collection date" text —
+      // i.e. the card for this specific collection type, not the whole page.
+      let card = headingEl.parentElement
+      while (card && !/next collection date/i.test(card.textContent || '')) {
+        card = card.parentElement
+      }
+      if (!card) {
+        return {
+          nextCollectionDay: null,
+          cardHtml: headingEl.parentElement ? headingEl.parentElement.outerHTML.slice(0, 4000) : null,
+          cardText: (document.body.innerText || '').slice(0, 2000),
+        }
+      }
+
+      const cardHtml = card.outerHTML.slice(0, 4000)
+      const cardText = (card.innerText || '').slice(0, 2000)
+
+      // Find the leaf label element whose own text is "Your next collection date is",
+      // then read the value from its next sibling (or, failing that, from text
+      // following the label within the same parent).
+      const nodes = Array.from(card.querySelectorAll('*'))
+      const labelEl = nodes.find(
+        (el) => el.children.length === 0 && /next collection date is\s*:?\s*$/i.test((el.textContent || '').trim()),
+      )
+
+      let nextCollectionDay = null
+      if (labelEl) {
+        let sib = labelEl.nextElementSibling
+        while (sib && !(sib.textContent || '').trim()) sib = sib.nextElementSibling
+        if (sib) nextCollectionDay = (sib.textContent || '').trim()
+      }
+      if (!nextCollectionDay) {
+        const match = cardText.match(/next collection date is\s*:?\s*\n?\s*([^\n]+)/i)
+        if (match) nextCollectionDay = match[1].trim()
+      }
+
+      return { nextCollectionDay, cardHtml, cardText }
+    }, HEADING_TEXT)
 
     res.status(200).json({
       success: true,
       postcode: POSTCODE,
       address: ADDRESS,
       matchedAddress: addressResult.text,
-      nextCollectionDay,
-      snippet: snippet ? snippet.trim() : null,
+      nextCollectionDay: extracted.nextCollectionDay,
+      cardText: extracted.cardText,
+      cardHtml: extracted.cardHtml,
     })
   } catch (err) {
     let screenshot = null

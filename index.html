@@ -48,6 +48,18 @@
         border-radius: 0.5rem;
         margin-top: 1rem;
       }
+      details {
+        text-align: left;
+        margin-top: 1rem;
+        font-size: 0.85rem;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: rgba(127, 127, 127, 0.12);
+        padding: 0.6rem;
+        border-radius: 0.5rem;
+      }
     </style>
   </head>
   <body>
@@ -57,6 +69,29 @@
     </main>
     <script>
       const el = document.getElementById('result')
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+      }
+
+      function debugHtml(data) {
+        let html = ''
+        if (data.cardText) {
+          html +=
+            '<details><summary>Card text (what the scraper read)</summary><pre>' +
+            escapeHtml(data.cardText) +
+            '</pre></details>'
+        }
+        if (data.cardHtml) {
+          html +=
+            '<details><summary>Card HTML</summary><pre>' + escapeHtml(data.cardHtml) + '</pre></details>'
+        }
+        return html
+      }
+
       fetch('/api/collection-day')
         .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
         .then(({ ok, data }) => {
@@ -67,13 +102,15 @@
               '": ' +
               (data.message || 'unknown error') +
               '</p>' +
-              (data.screenshot ? '<img src="' + data.screenshot + '" alt="Failure screenshot" />' : '')
+              (data.screenshot ? '<img src="' + data.screenshot + '" alt="Failure screenshot" />' : '') +
+              debugHtml(data)
             return
           }
           el.innerHTML =
             '<div class="answer">Your next collection day is ' +
-            (data.nextCollectionDay || '(not found)') +
-            '</div>'
+            (data.nextCollectionDay || '(not found — see debug info below)') +
+            '</div>' +
+            debugHtml(data)
         })
         .catch((err) => {
           el.innerHTML = '<p class="error">Request failed: ' + err.message + '</p>'
