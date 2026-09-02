@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Garden waste collection day</title>
+    <title>The Drive, Sevenoaks &mdash; Garden Waste</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -27,6 +27,10 @@
         font-weight: 600;
         opacity: 0.7;
         margin: 0 0 1rem;
+      }
+      .answer-label {
+        font-size: 0.95rem;
+        margin: 0 0 0.35rem;
       }
       .answer {
         font-size: 1.6rem;
@@ -64,7 +68,7 @@
   </head>
   <body>
     <main>
-      <h1>Fortnightly garden waste collection &mdash; TN13 3AB, 17 The Drive</h1>
+      <h1>The Drive, Sevenoaks &mdash; Garden Waste</h1>
       <div id="result" class="muted">Checking…</div>
     </main>
     <script>
@@ -107,7 +111,8 @@
             return
           }
           el.innerHTML =
-            '<div class="answer">Your next collection day is ' +
+            '<p class="answer-label">Your next garden waste collection date is</p>' +
+            '<div class="answer">' +
             (data.nextCollectionDay || '(not found — see debug info below)') +
             '</div>' +
             debugHtml(data)
