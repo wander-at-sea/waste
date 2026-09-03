@@ -42,10 +42,6 @@
         font-weight: 700;
         line-height: 1.3;
       }
-      .quiet-link {
-        color: inherit;
-        text-decoration: none;
-      }
       .muted {
         opacity: 0.65;
         font-size: 0.95rem;
@@ -149,8 +145,7 @@
       // "Today (Thursday)" / "Tomorrow (Friday)" / "This Saturday" / "Next Monday" / "Monday".
       // On a weekday, "This" runs through the coming Sunday. On a weekend, people already
       // think of the coming week as "this" week, so the cutoff shifts to the coming Friday
-      // instead (see /explainer.html). "Next" is the following 7-day block; beyond that it's
-      // just the plain day name.
+      // instead. "Next" is the following 7-day block; beyond that it's just the plain day name.
       function describeDate(target, today) {
         const t = startOfDay(target)
         const now = startOfDay(today)
@@ -180,12 +175,7 @@
           return escapeHtml(d.parenthesise) + ' (' + escapeHtml(d.weekday) + ')'
         }
         if (d.label) {
-          return (
-            '<a class="quiet-link" href="/explainer.html">' +
-            escapeHtml(d.label) +
-            '</a> ' +
-            escapeHtml(d.weekday)
-          )
+          return escapeHtml(d.label) + ' ' + escapeHtml(d.weekday)
         }
         return escapeHtml(d.weekday)
       }
