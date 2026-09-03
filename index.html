@@ -73,6 +73,11 @@
     </main>
     <script>
       const el = document.getElementById('result')
+      const STORAGE_KEY = 'wasteCollection'
+      const MONTHS = [
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december',
+      ]
 
       function escapeHtml(value) {
         return String(value)
@@ -96,30 +101,87 @@
         return html
       }
 
-      fetch('/api/collection-day')
-        .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
-        .then(({ ok, data }) => {
-          if (!ok || !data.success) {
-            el.innerHTML =
-              '<p class="error">Lookup failed at step "' +
-              (data.step || 'unknown') +
-              '": ' +
-              (data.message || 'unknown error') +
-              '</p>' +
-              (data.screenshot ? '<img src="' + data.screenshot + '" alt="Failure screenshot" />' : '') +
-              debugHtml(data)
-            return
-          }
-          el.innerHTML =
-            '<p class="answer-label">Your next garden waste collection date is</p>' +
-            '<div class="answer">' +
-            (data.nextCollectionDay || '(not found — see debug info below)') +
-            '</div>' +
-            (data.nextCollectionDay ? '' : debugHtml(data))
-        })
-        .catch((err) => {
-          el.innerHTML = '<p class="error">Request failed: ' + err.message + '</p>'
-        })
+      // Parses the scraped "Friday 04 September 2026" format into a local Date
+      // (midnight). Returns null if the text isn't in that shape.
+      function parseCollectionDate(text) {
+        if (!text) return null
+        const parts = text.trim().split(/\s+/)
+        if (parts.length < 4) return null
+        const day = parseInt(parts[1], 10)
+        const monthIndex = MONTHS.indexOf(parts[2].toLowerCase())
+        const year = parseInt(parts[3], 10)
+        if (Number.isNaN(day) || monthIndex === -1 || Number.isNaN(year)) return null
+        return new Date(year, monthIndex, day)
+      }
+
+      function startOfToday() {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        return d
+      }
+
+      function loadCache() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY)
+          if (!raw) return null
+          const parsed = JSON.parse(raw)
+          return parsed && parsed.nextCollectionDay ? parsed : null
+        } catch {
+          return null
+        }
+      }
+
+      function saveCache(nextCollectionDay) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ nextCollectionDay }))
+        } catch {
+          // ignore storage failures (private browsing, quota, etc.)
+        }
+      }
+
+      function showAnswer(nextCollectionDay, data) {
+        el.innerHTML =
+          '<p class="answer-label">Your next garden waste collection date is</p>' +
+          '<div class="answer">' +
+          (nextCollectionDay || '(not found — see debug info below)') +
+          '</div>' +
+          (nextCollectionDay ? '' : debugHtml(data || {}))
+      }
+
+      function fetchFresh() {
+        el.innerHTML = '<p class="muted">Just checking now…</p>'
+        fetch('/api/collection-day')
+          .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+          .then(({ ok, data }) => {
+            if (!ok || !data.success) {
+              el.innerHTML =
+                '<p class="error">Lookup failed at step "' +
+                (data.step || 'unknown') +
+                '": ' +
+                (data.message || 'unknown error') +
+                '</p>' +
+                (data.screenshot ? '<img src="' + data.screenshot + '" alt="Failure screenshot" />' : '') +
+                debugHtml(data)
+              return
+            }
+            if (data.nextCollectionDay) saveCache(data.nextCollectionDay)
+            showAnswer(data.nextCollectionDay, data)
+          })
+          .catch((err) => {
+            el.innerHTML = '<p class="error">Request failed: ' + err.message + '</p>'
+          })
+      }
+
+      const cached = loadCache()
+      const cachedDate = cached ? parseCollectionDate(cached.nextCollectionDay) : null
+
+      if (cachedDate && cachedDate >= startOfToday()) {
+        // Cached date hasn't passed yet — show it without hitting the council site again.
+        showAnswer(cached.nextCollectionDay, null)
+      } else {
+        // No cache, unparseable cache, or the stored date has already passed — go check.
+        fetchFresh()
+      }
     </script>
   </body>
 </html>
