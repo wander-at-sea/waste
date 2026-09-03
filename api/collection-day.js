@@ -1,3 +1,4 @@
+import { kv } from '@vercel/kv'
 import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
 
@@ -7,6 +8,11 @@ const TARGET_URL = 'https://sevenoaks-dc-host01.oncreate.app/w/webpage/waste-col
 const HEADING_TEXT = 'Fortnightly garden waste collection'
 const POSTCODE = 'TN13 3AB'
 const ADDRESS = '17 The Drive'
+const KV_KEY = 'waste-collection:next-day'
+const MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+]
 
 class StepError extends Error {
   constructor(step, message) {
@@ -24,6 +30,29 @@ function escapeRegExp(value) {
 function buildAddressRegexSource(address) {
   const words = address.trim().split(/\s+/).filter(Boolean).map(escapeRegExp)
   return `\\b${words.join('\\s+')}\\b`
+}
+
+// Today's date in the UK, as YYYY-MM-DD (so it lines up with the council's own day boundary
+// regardless of which region the serverless function happens to run in).
+function todayLondonISO() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date())
+}
+
+// Parses the scraped "Friday 04 September 2026" format into a YYYY-MM-DD string.
+function collectionDateISO(text) {
+  const parts = (text || '').trim().split(/\s+/)
+  if (parts.length < 4) return null
+  const day = parseInt(parts[1], 10)
+  const monthIndex = MONTHS.indexOf(parts[2].toLowerCase())
+  const year = parseInt(parts[3], 10)
+  if (Number.isNaN(day) || monthIndex === -1 || Number.isNaN(year)) return null
+  return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function isStillValid(cached) {
+  if (!cached || !cached.nextCollectionDay) return false
+  const iso = collectionDateISO(cached.nextCollectionDay)
+  return Boolean(iso) && iso >= todayLondonISO()
 }
 
 
@@ -168,6 +197,16 @@ async function waitForHeading(page, headingText, timeoutMs) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
+  try {
+    const cached = await kv.get(KV_KEY)
+    if (isStillValid(cached)) {
+      res.status(200).json({ ...cached, success: true, cached: true })
+      return
+    }
+  } catch {
+    // KV not set up / unreachable — fall through and scrape live.
+  }
+
   let browser
   let page
   const steps = []
@@ -264,7 +303,7 @@ export default async function handler(req, res) {
       return { nextCollectionDay, cardHtml, cardText }
     }, HEADING_TEXT)
 
-    res.status(200).json({
+    const responseBody = {
       success: true,
       postcode: POSTCODE,
       address: ADDRESS,
@@ -272,7 +311,23 @@ export default async function handler(req, res) {
       nextCollectionDay: extracted.nextCollectionDay,
       cardText: extracted.cardText,
       cardHtml: extracted.cardHtml,
-    })
+      cached: false,
+    }
+
+    if (extracted.nextCollectionDay) {
+      try {
+        await kv.set(KV_KEY, {
+          postcode: POSTCODE,
+          address: ADDRESS,
+          matchedAddress: addressResult.text,
+          nextCollectionDay: extracted.nextCollectionDay,
+        })
+      } catch {
+        // KV not set up / unreachable — still return the freshly scraped result.
+      }
+    }
+
+    res.status(200).json(responseBody)
   } catch (err) {
     let screenshot = null
     try {
